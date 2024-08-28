@@ -12,6 +12,7 @@
 
 
 #include "config.h"
+#include <cstdint>
 #define __STDC_FORMAT_MACROS 1 // enable PRI* for C++
 
 #include <inttypes.h>
@@ -1132,9 +1133,7 @@ scsiPrintSelfTest(scsi_device * device)
         // timestamp in power-on hours (or zero if test in progress)
         unsigned int poh = sg_get_unaligned_be16(ucp + 6);
         unsigned int u, tr;
-        char st[32];
 
-        snprintf(st, sizeof(st), "scsi_self_test_%d", k);
         // The spec says "all 20 bytes will be zero if no test" but
         // DG has found otherwise.  So this is a heuristic.
         if ((0 == poh) && (0 == ucp[4]))
@@ -1153,8 +1152,8 @@ scsiPrintSelfTest(scsi_device * device)
         // print parameter code (test number) & self-test code text
         u = (ucp[4] >> 5) & 0x7;
         jout("#%2d  %s", sg_get_unaligned_be16(ucp + 0), self_test_code[u]);
-        jglb[st]["code"]["value"] = u;
-        jglb[st]["code"]["string"] = rtrim(self_test_code[u]);
+        jglb["scsi_self_test"]["table"][k]["code"]["value"] = u;
+        jglb["scsi_self_test"]["table"][k]["code"]["string"] = rtrim(self_test_code[u]);
 
         // check the self-test result nibble, using the self-test results
         // field table from T10/1416-D (SPC-3) Rev. 23, section 7.2.10:
@@ -1190,8 +1189,8 @@ scsiPrintSelfTest(scsi_device * device)
             break;
         }
         jout("  %s%s", self_test_result[tr], (tr == 7 ? fixup_stres7 : ""));
-        jglb[st]["result"]["value"] = tr;
-        jglb[st]["result"]["string"] = rtrim(self_test_result[tr]);
+        jglb["scsi_self_test"]["table"][k]["result"]["value"] = tr;
+        jglb["scsi_self_test"]["table"][k]["result"]["string"] = rtrim(self_test_result[tr]);
 
         // self-test number identifies test that failed and consists
         // of either the number of the segment that failed during
@@ -1202,8 +1201,8 @@ scsiPrintSelfTest(scsi_device * device)
         u = ucp[5];
         if (u > 0) {
             jout(" %3u",  u);
-            jglb[st]["failed_segment"]["value"] = u;
-            jglb[st]["failed_segment"]["aka"] = "self_test_number";
+            jglb["scsi_self_test"]["table"][k]["failed_segment"]["value"] = u;
+            jglb["scsi_self_test"]["table"][k]["failed_segment"]["aka"] = "self_test_number";
         } else
             jout("   -");
 
@@ -1211,11 +1210,11 @@ scsiPrintSelfTest(scsi_device * device)
         if (poh==0 && tr==0xf) {
         // self-test in progress
             jout("     NOW");
-            jglb[st]["self_test_in_progress"] = true;
+            jglb["scsi_self_test"]["table"][k]["self_test_in_progress"] = true;
         } else {
             jout("   %5d", poh);
-            jglb[st]["power_on_time"]["hours"] = poh;
-            jglb[st]["power_on_time"]["aka"] = "accumulated_power_on_hours";
+            jglb["scsi_self_test"]["table"][k]["power_on_time"]["hours"] = poh;
+            jglb["scsi_self_test"]["table"][k]["power_on_time"]["aka"] = "accumulated_power_on_hours";
         }
 
         // construct 8-byte integer address of first failure
@@ -1229,8 +1228,8 @@ scsiPrintSelfTest(scsi_device * device)
             snprintf(buff, sizeof(buff), "%" PRIu64, ull);
             // snprintf(buff, sizeof(buff), "0x%" PRIx64, ull);
             jout("%18s", buff);
-            jglb[st]["lba_first_failure"]["value"] = ull;
-            jglb[st]["lba_first_failure"]["aka"] = "address_of_first_failure";
+            jglb["scsi_self_test"]["table"][k]["lba_first_failure"]["value"] = ull;
+            jglb["scsi_self_test"]["table"][k]["lba_first_failure"]["aka"] = "address_of_first_failure";
         } else
             jout("                 -");
 
@@ -1241,12 +1240,12 @@ scsiPrintSelfTest(scsi_device * device)
 
             jout(" [0x%x 0x%x 0x%x]\n", ucp[16] & 0xf, ucp[17], ucp[18]);
             u = ucp[16] & 0xf;
-            jglb[st]["sense_key"]["value"] = u;
-            jglb[st]["sense_key"]["string"] =
+            jglb["scsi_self_test"]["table"][k]["sense_key"]["value"] = u;
+            jglb["scsi_self_test"]["table"][k]["sense_key"]["string"] =
                         scsi_get_sense_key_str(u, sizeof(b), b);
-            jglb[st]["asc"] = ucp[17];
-            jglb[st]["ascq"] = ucp[18];
-            jglb[st]["vendor_specific"] = ucp[19];
+            jglb["scsi_self_test"]["table"][k]["asc"] = ucp[17];
+            jglb["scsi_self_test"]["table"][k]["ascq"] = ucp[18];
+            jglb["scsi_self_test"]["table"][k]["vendor_specific"] = ucp[19];
         } else
             pout(" [-   -    -]\n");
     }
@@ -1454,7 +1453,7 @@ scsiPrintBackgroundResults(scsi_device * device, bool only_pow_time)
 }
 
 static int64_t
-scsiGetTimeUnitInNano(const uint8_t * ucp, int num, uint16_t ti_pc) 
+scsiGetTimeUnitInNano(const uint8_t * ucp, int num, uint16_t ti_pc)
 {
     uint16_t loop_pc, pl;
     uint32_t a_exp, a_int, casc;
